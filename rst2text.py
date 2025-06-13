@@ -14,12 +14,14 @@ import docutils.utils
 import docutils.utils.roman
 import docutils.writers
 
-# XXX Hack: monkeypatch docutils to support gemini:// URIs
-import docutils.utils.urischemes
+import pprint
 
-if "gemini" not in docutils.utils.urischemes.schemes:
-    docutils.utils.urischemes.schemes["gemini"] = ""
-# XXX
+## XXX Hack: monkeypatch docutils to support gemini:// URIs
+#import docutils.utils.urischemes
+#
+#if "gemini" not in docutils.utils.urischemes.schemes:
+#    docutils.utils.urischemes.schemes["gemini"] = ""
+## XXX
 
 
 def convert_to_unix_end_of_line(text):
@@ -158,7 +160,7 @@ class Node:
         """
         self.rawtext += text
 
-    def to_gemtext(self, options={}):
+    def to_text(self, options={}):
         """Generates the Gemtext markup from the current node."""
         raise NotImplementedError()
 
@@ -171,12 +173,16 @@ class NodeGroup(Node):
         #: Nodes of the group
         self.nodes = []
 
-    def to_gemtext(self):
-        return "\n".join([node.to_gemtext() for node in self.nodes])
+    def to_text(self):
+        return "\n".join([node.to_text() for node in self.nodes])
 
 
 class ParagraphNode(Node):
-    def to_gemtext(self):
+    def to_text(self):
+        pprint.pprint(self.rst_node.__dict__)
+        #for child in self.rst_node.children:
+        #    print(child.__dict__)
+        #print(self.rst_node.children.reference)
         return remove_newlines(self.rawtext)
 
 
@@ -185,11 +191,11 @@ class TitleNode(Node):
         Node.__init__(self, rst_node)
         self.level = level
 
-    def to_gemtext(self):
-        return " ".join(
+    def to_text(self):
+        return "\n".join(
             [
-                "#" * max(1, min(3, self.level)),
                 self.rawtext,
+                "="*len(self.rawtext)
             ]
         )
 
@@ -199,7 +205,7 @@ class PreformattedTextNode(Node):
         Node.__init__(self, rst_node)
         self.alt = alt
 
-    def to_gemtext(self):
+    def to_text(self):
         return "```%s\n%s\n```" % (
             self.alt,
             self.rawtext,
@@ -207,23 +213,23 @@ class PreformattedTextNode(Node):
 
 
 class BlockQuoteNode(NodeGroup):
-    def to_gemtext(self):
-        return "\n>\n".join(["> %s" % node.to_gemtext() for node in self.nodes])
+    def to_text(self):
+        return "\n>\n".join(["> %s" % node.to_text() for node in self.nodes])
 
 
 class BulletListNode(NodeGroup):
-    def to_gemtext(self):
+    def to_text(self):
         items = []
         for node in self.nodes:
             if type(node) is ListItemNode:
-                items.append("* %s" % node.to_gemtext())
+                items.append("* %s" % node.to_text())
             else:
-                items.append(node.to_gemtext())
+                items.append(node.to_text())
         return "\n".join(items)
 
 
 class ListItemNode(Node):
-    def to_gemtext(self):
+    def to_text(self):
         return remove_newlines(self.rawtext)
 
 
@@ -256,7 +262,7 @@ class EnumaratedListNode(BulletListNode):
     def _to_upperroman(self, number):
         return docutils.utils.roman.toRoman(number)
 
-    def to_gemtext(self):
+    def to_text(self):
         items = []
         i = self.start
         convertor = getattr(self, "_to_%s" % self.enumtype)
@@ -268,11 +274,11 @@ class EnumaratedListNode(BulletListNode):
                         self.prefix,
                         convertor(i),
                         self.suffix,
-                        node.to_gemtext(),
+                        node.to_text(),
                     )
                 )
             else:
-                items.append(node.to_gemtext())
+                items.append(node.to_text())
             i += 1
         return "\n".join(items)
 
@@ -290,7 +296,7 @@ class SystemMessageNode(NodeGroup):
             self.source,
             self.line,
             self.type_,
-            self.to_gemtext(),
+            self.to_text(),
         )
 
 
@@ -304,13 +310,13 @@ class LinkNode(Node):
         else:
             self.rawtext = uri
 
-    def to_gemtext(self):
+    def to_text(self):
         if not self.uri:
             raise ValueError("Link URI not resolved!")
         if self.rawtext == self.uri:
-            return "=> %s" % self.uri
+            return self.uri
         else:
-            return "=> %s %s" % (self.uri, self.rawtext)
+            return f"{self.rawtext} ({self.uri})"
 
 
 class LinkGroupNode(NodeGroup):
@@ -318,7 +324,7 @@ class LinkGroupNode(NodeGroup):
 
 
 class SeparatorNode(Node):
-    def to_gemtext(self):
+    def to_text(self):
         return "-" * 80
 
 
@@ -327,7 +333,7 @@ class RawNode(Node):
         Node.__init__(self, rst_node)
         self.format = format_
 
-    def to_gemtext(self):
+    def to_text(self):
         return self.rawtext
 
 
@@ -364,21 +370,21 @@ class AdmonitionNode(NodeGroup):
             return "⛔️ Error"
         return ""
 
-    def to_gemtext(self):
+    def to_text(self):
         result = "-" * 80
         result += "\n"
         result += self.gen_title()
         result += "\n"
         result += "-" * 80
         result += "\n"
-        result += NodeGroup.to_gemtext(self)
+        result += NodeGroup.to_text(self)
         result += "\n"
         result += "-" * 80
         return result
 
 
-class GemtextTranslator(docutils.nodes.GenericNodeVisitor):
-    """Translate reStructuredText text nodes to Gemini text nodes."""
+class TextTranslator(docutils.nodes.GenericNodeVisitor):
+    """Translate reStructuredText text nodes to text nodes."""
 
     #: Nodes to ignore as there is no equivalent markup in Gemtext.
     #: NOTE: the text inside the notes will be added to the parent node.
@@ -682,7 +688,7 @@ class GemtextTranslator(docutils.nodes.GenericNodeVisitor):
             else:
                 if list_item_node.rawtext:
                     list_item_node.append_text(" ")
-                list_item_node.append_text(node.to_gemtext())
+                list_item_node.append_text(node.to_text())
         if list_item_node.rawtext:
             self.nodes.append(list_item_node)
 
@@ -723,7 +729,7 @@ class GemtextTranslator(docutils.nodes.GenericNodeVisitor):
         if len(nodes) == 1 and nodes[0].rawtext == paragraph_node.rawtext:
             self.nodes.append(nodes[0])
         else:
-            if paragraph_node.to_gemtext().strip():
+            if paragraph_node.to_text().strip():
                 self.nodes.append(paragraph_node)
             if nodes:
                 link_group_node = LinkGroupNode(rst_node)
@@ -744,6 +750,7 @@ class GemtextTranslator(docutils.nodes.GenericNodeVisitor):
     # reference
 
     def visit_reference(self, rst_node):
+        print(rst_node)
         text = ""
         for child_node in rst_node.children:
             if child_node.tagname == "image":
@@ -896,7 +903,7 @@ class GemtextTranslator(docutils.nodes.GenericNodeVisitor):
         pass
 
 
-class GemtextWriter(docutils.writers.Writer):
+class TextWriter(docutils.writers.Writer):
     """Write Gemtext from reStructuredText ducument."""
 
     def __init__(self):
@@ -908,14 +915,14 @@ class GemtextWriter(docutils.writers.Writer):
         self.visitor = None
 
     def translate(self):
-        self.visitor = GemtextTranslator(self.document)
+        self.visitor = TextTranslator(self.document)
         for Transform in self.transforms:
             transform = Transform(self.document)
             transform.apply()
         self.document.walkabout(self.visitor)
         self._before_translate_output_generation_hook()
         self.output = (
-            "\n\n".join([node.to_gemtext() for node in self.visitor.nodes]) + "\n"
+            "\n\n".join([node.to_text() for node in self.visitor.nodes]) + "\n"
         )
 
     def _before_translate_output_generation_hook(self):
@@ -955,9 +962,9 @@ def convert(rst_text, source_path="document"):
 
 def main(args=sys.argv[1:]):
     parser = argparse.ArgumentParser(
-        prog="rst2gemtext",
-        description="Converts reStructuredText to Gemtext (Gemini markup format)",
-        epilog="Inaccurate output? Report bugs to https://github.com/flozz/rst2gemtext/issues",
+        prog="rst2text",
+        description="Converts reStructuredText to text",
+        epilog="Inaccurate output? Report bugs to https://github.com/Dryusdan/rst2text/issues",
     )
 
     parser.add_argument(
@@ -966,8 +973,8 @@ def main(args=sys.argv[1:]):
         type=argparse.FileType("r"),
     )
     parser.add_argument(
-        "output_gemtext",
-        help="the output Gemtext file",
+        "output_text",
+        help="the output text file",
         type=argparse.FileType("w"),
     )
     parser.add_argument(
@@ -985,8 +992,8 @@ def main(args=sys.argv[1:]):
     if params.print_xml:
         print(document.asdom().toprettyxml(indent="  "))
 
-    writer = GemtextWriter()
-    writer.write(document, params.output_gemtext)
+    writer = TextWriter()
+    writer.write(document, params.output_text)
 
     for message in writer.visitor.messages:
         print(message)

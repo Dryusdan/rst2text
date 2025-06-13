@@ -1,2 +1,29 @@
 [tool.black]
 target-version = ['py39']
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.0"
+nox = "^2025.5.1"
+flake8 = "^7.2.0"
+
+[project]
+name = "rst2text"
+version = "0.1.0"
+description = "Converts reStructuredText to text"
+authors = [
+    {name = "Dryusdan",email = "git@dryusdan.fr"}
+]
+license = {text = "GPLv3"}
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "attrs (>=25.3.0,<26.0.0)",
+    "click (>=8.2.1,<9.0.0)",
+    "argcomplete (>=3.6.2,<4.0.0)",
+    "docutils (>=0.21.2,<0.22.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
