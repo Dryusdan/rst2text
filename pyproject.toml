@@ -14,7 +14,7 @@ authors = [
     {name = "Dryusdan",email = "git@dryusdan.fr"}
 ]
 license = {text = "GPLv3"}
-readme = "README.md"
+readme = "README.rst"
 requires-python = ">=3.10"
 dependencies = [
     "attrs (>=25.3.0,<26.0.0)",

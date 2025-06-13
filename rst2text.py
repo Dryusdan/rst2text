@@ -14,12 +14,13 @@ import docutils.utils
 import docutils.utils.roman
 import docutils.writers
 
-import pprint
+import textwrap
+
 
 ## XXX Hack: monkeypatch docutils to support gemini:// URIs
-#import docutils.utils.urischemes
+# import docutils.utils.urischemes
 #
-#if "gemini" not in docutils.utils.urischemes.schemes:
+# if "gemini" not in docutils.utils.urischemes.schemes:
 #    docutils.utils.urischemes.schemes["gemini"] = ""
 ## XXX
 
@@ -63,6 +64,10 @@ def remove_newlines(text):
     'Windows macOS 9 and Unix  EOL'
     """
     return convert_to_unix_end_of_line(text).replace("\n", " ")
+
+
+def wrap_text(text: str, max_char: int = 89):
+    return "\n".join(textwrap.wrap(text, max_char))
 
 
 def flatten_node_tree(nodes):
@@ -179,11 +184,20 @@ class NodeGroup(Node):
 
 class ParagraphNode(Node):
     def to_text(self):
-        pprint.pprint(self.rst_node.__dict__)
-        #for child in self.rst_node.children:
-        #    print(child.__dict__)
-        #print(self.rst_node.children.reference)
-        return remove_newlines(self.rawtext)
+        text = self.rawtext
+        for child in self.rst_node.children:
+            if (
+                hasattr(child, "tagname")
+                and child.tagname == "reference"
+                and hasattr(child, "attributes")
+                and "name" in child.attributes
+                and "refuri" in child.attributes
+            ):
+                url_name = child.attributes["name"]
+                url = child.attributes["refuri"]
+                text = text.replace(url_name, f"{url_name} ({url})")
+                # pprint.pprint(child.attributes["name"])
+        return wrap_text(remove_newlines(text))
 
 
 class TitleNode(Node):
@@ -192,12 +206,7 @@ class TitleNode(Node):
         self.level = level
 
     def to_text(self):
-        return "\n".join(
-            [
-                self.rawtext,
-                "="*len(self.rawtext)
-            ]
-        )
+        return "\n".join([self.rawtext, "=" * len(self.rawtext)])
 
 
 class PreformattedTextNode(Node):
@@ -230,7 +239,7 @@ class BulletListNode(NodeGroup):
 
 class ListItemNode(Node):
     def to_text(self):
-        return remove_newlines(self.rawtext)
+        return wrap_text(remove_newlines(self.rawtext))
 
 
 class EnumaratedListNode(BulletListNode):
@@ -316,7 +325,7 @@ class LinkNode(Node):
         if self.rawtext == self.uri:
             return self.uri
         else:
-            return f"{self.rawtext} ({self.uri})"
+            return wrap_text(f"=> {self.uri} {self.rawtext}")
 
 
 class LinkGroupNode(NodeGroup):
@@ -325,7 +334,7 @@ class LinkGroupNode(NodeGroup):
 
 class SeparatorNode(Node):
     def to_text(self):
-        return "-" * 80
+        return "-" * 89
 
 
 class RawNode(Node):
@@ -749,36 +758,36 @@ class TextTranslator(docutils.nodes.GenericNodeVisitor):
 
     # reference
 
-    def visit_reference(self, rst_node):
-        print(rst_node)
-        text = ""
-        for child_node in rst_node.children:
-            if child_node.tagname == "image":
-                continue
-            elif child_node.tagname != "#text":
-                raise ValueError(
-                    "Unexpected tag found in a reference: %s" % child_node.tagname
-                )
-            text += child_node.astext()
-        text = remove_newlines(text)
-        link_node = LinkNode(
-            rst_node,
-            refname=(
-                rst_node.attributes["refname"]
-                if "refname" in rst_node.attributes
-                else None
-            ),
-            uri=(
-                rst_node.attributes["refuri"]
-                if "refuri" in rst_node.attributes
-                else None
-            ),
-            text=text if text else None,
-        )
-        self.nodes.append(link_node)
+    # def visit_reference(self, rst_node):
+    #    print(rst_node)
+    #    text = ""
+    #    for child_node in rst_node.children:
+    #        if child_node.tagname == "image":
+    #            continue
+    #        elif child_node.tagname != "#text":
+    #            raise ValueError(
+    #                "Unexpected tag found in a reference: %s" % child_node.tagname
+    #            )
+    #        text += child_node.astext()
+    #    text = remove_newlines(text)
+    #    link_node = LinkNode(
+    #        rst_node,
+    #        refname=(
+    #            rst_node.attributes["refname"]
+    #            if "refname" in rst_node.attributes
+    #            else None
+    #        ),
+    #        uri=(
+    #            rst_node.attributes["refuri"]
+    #            if "refuri" in rst_node.attributes
+    #            else None
+    #        ),
+    #        text=text if text else None,
+    #    )
+    #    self.nodes.append(link_node)
 
-    def depart_reference(self, rst_node):
-        pass
+    # def depart_reference(self, rst_node):
+    #    pass
 
     # section
 
