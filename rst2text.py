@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
-import re
-import sys
 import argparse
 import math
+import re
+import sys
+import textwrap
 from io import StringIO
 
 import docutils.frontend
@@ -13,9 +14,6 @@ import docutils.transforms.references
 import docutils.utils
 import docutils.utils.roman
 import docutils.writers
-
-import textwrap
-
 
 ## XXX Hack: monkeypatch docutils to support gemini:// URIs
 # import docutils.utils.urischemes
