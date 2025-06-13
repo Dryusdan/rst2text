@@ -961,7 +961,7 @@ def convert(rst_text, source_path="document"):
     """
     document = parse_rst(rst_text, source_path)
     output_io = StringIO()
-    writer = GemtextWriter()
+    writer = TextWriter()
     writer.write(document, output_io)
     output_io.seek(0)
     return output_io.read()
